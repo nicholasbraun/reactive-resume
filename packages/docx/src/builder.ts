@@ -10,6 +10,7 @@ import {
 	ShadingType,
 	Table,
 	TableCell,
+	TableLayoutType,
 	TableRow,
 	TextRun,
 	WidthType,
@@ -291,10 +292,23 @@ function buildHeader(data: ResumeData, colorHex: string, textColorHex: string): 
 
 // --- Two-column table layout ---
 
+interface ColumnWidths {
+	/** Main column width in twips. */
+	main: number;
+	/** Sidebar column width in twips; `main + sidebar` equals the page's text area width. */
+	sidebar: number;
+}
+
+function splitColumns(textAreaWidthTwips: number, sidebarWidthPct: number): ColumnWidths {
+	const sidebar = Math.round((textAreaWidthTwips * sidebarWidthPct) / 100);
+	return { main: textAreaWidthTwips - sidebar, sidebar };
+}
+
 function buildTwoColumnTable(
 	mainParagraphs: Paragraph[],
 	sidebarParagraphs: Paragraph[],
 	sidebarWidthPct: number,
+	columnWidths: ColumnWidths,
 	gapXTwips: number,
 	sidebarSide: "left" | "right" | "none",
 	sidebarShadingHex?: string,
@@ -332,11 +346,15 @@ function buildTwoColumnTable(
 		children: mainChildren,
 	});
 
-	const cells = sidebarSide === "left" ? [sidebarCell, mainCell] : [mainCell, sidebarCell];
+	const sidebarFirst = sidebarSide === "left";
+	const cells = sidebarFirst ? [sidebarCell, mainCell] : [mainCell, sidebarCell];
 
 	return new Table({
 		rows: [new TableRow({ children: cells })],
 		width: { size: 100, type: WidthType.PERCENTAGE },
+		// Pages and LibreOffice lay columns out from the grid, which docx otherwise fills with 100 twips per column.
+		columnWidths: sidebarFirst ? [columnWidths.sidebar, columnWidths.main] : [columnWidths.main, columnWidths.sidebar],
+		layout: TableLayoutType.FIXED,
 		borders: {
 			top: { style: BorderStyle.NONE, size: 0 },
 			bottom: { style: BorderStyle.NONE, size: 0 },
@@ -373,8 +391,11 @@ export function buildDocument(data: ResumeData, resolveTitle?: SectionTitleResol
 	const marginXTwips = ptToTwips(page.marginX);
 	const marginYTwips = ptToTwips(page.marginY);
 	const gapXTwips = ptToTwips(page.gapX);
+	const pageWidthTwips = convertMillimetersToTwip(pageSize.width);
+	const textAreaWidthTwips = pageWidthTwips - 2 * marginXTwips;
 
 	const sidebarWidth = data.metadata.layout.sidebarWidth;
+	const columnWidths = splitColumns(textAreaWidthTwips, sidebarWidth);
 
 	// Template-aware layout config
 	const templateConfig = TEMPLATE_CONFIGS[data.metadata.template];
@@ -452,6 +473,7 @@ export function buildDocument(data: ResumeData, resolveTitle?: SectionTitleResol
 						mainParagraphs,
 						sidebarParagraphs,
 						sidebarWidth,
+						columnWidths,
 						gapXTwips,
 						templateConfig.sidebarSide,
 						sidebarShadingHex,
@@ -484,7 +506,7 @@ export function buildDocument(data: ResumeData, resolveTitle?: SectionTitleResol
 				properties: {
 					page: {
 						size: {
-							width: convertMillimetersToTwip(pageSize.width),
+							width: pageWidthTwips,
 							height: convertMillimetersToTwip(pageSize.height),
 						},
 						margin: {
