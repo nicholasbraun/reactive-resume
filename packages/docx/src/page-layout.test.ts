@@ -65,6 +65,7 @@ function twoColumnSample(): ResumeData {
 	const data = structuredClone(sampleResumeData);
 	data.metadata.template = "lapras";
 	data.metadata.layout.sidebarWidth = 35;
+	data.metadata.page.gapX = 4;
 	data.metadata.layout.pages = [
 		{ fullWidth: false, main: ["summary", "experience"], sidebar: ["skills", "education"] },
 	];
@@ -102,14 +103,23 @@ describe("DOCX page layout", () => {
 		expect(attrsOf(body, "w:tblLayout").map((attrs) => attrs["w:type"])).toEqual(["fixed"]);
 	});
 
-	it("right-aligns item dates at the inner edge of their table column", () => {
-		const data = twoColumnSample();
-		const { body } = render(data);
+	it("pads both sides of each table cell so readers don't fall back to their own default", () => {
+		const { body } = render(twoColumnSample());
+		// Cell margins are the only w:left/w:right elements carrying a width type; borders carry w:val.
+		const sides = (name: string) => attrsOf(body, name).filter((attrs) => attrs["w:type"] === "dxa");
+
+		expect(sides("w:left").map((attrs) => attrs["w:w"])).toEqual([80, 80]);
+		expect(sides("w:right").map((attrs) => attrs["w:w"])).toEqual([0, 0]);
+	});
+
+	it("keeps two-column dates clear of the 5pt cell insets Apple Pages applies", () => {
+		// Pages ignores cell margins; with the default 4pt gap the column's own padding is narrower than
+		// Pages' insets, so the tab stop has to leave 10pt instead.
+		const { body } = render(twoColumnSample());
 		const [main = 0, sidebar = 0] = attrsOf(body, "w:gridCol").map((attrs) => Number(attrs["w:w"]));
-		const gapX = data.metadata.page.gapX * 20;
 		const positions = tabStopPositions(body);
 
 		expect(positions.length).toBeGreaterThan(0);
-		for (const position of positions) expect([main - gapX, sidebar - gapX]).toContain(position);
+		for (const position of positions) expect([main - 200, sidebar - 200]).toContain(position);
 	});
 });

@@ -292,6 +292,12 @@ function buildHeader(data: ResumeData, colorHex: string, textColorHex: string): 
 
 // --- Two-column table layout ---
 
+/**
+ * Apple Pages ignores DOCX cell margins and insets cell text by 5pt on each side instead. Tab stops in a
+ * table cell have to fit that line as well, or right-aligned dates wrap onto a line of their own.
+ */
+const PAGES_CELL_INSETS_TWIPS = 2 * ptToTwips(5);
+
 interface ColumnWidths {
 	/** Main column width in twips. */
 	main: number;
@@ -323,13 +329,12 @@ function buildTwoColumnTable(
 		? { fill: sidebarShadingHex, type: ShadingType.CLEAR, color: "auto" }
 		: undefined;
 
-	const margins: { right?: number; left?: number } = {};
-
-	if (sidebarSide === "left") {
-		margins.right = gapXTwips;
-	} else if (sidebarSide === "right") {
-		margins.left = gapXTwips;
-	}
+	// Set both sides: for a side left unset, Word falls back to its own default cell margin (0.19 cm),
+	// which would narrow the column behind the tab stops computed in buildDocument.
+	const margins = {
+		left: sidebarSide === "right" ? gapXTwips : 0,
+		right: sidebarSide === "left" ? gapXTwips : 0,
+	};
 
 	const sidebarCell = new TableCell({
 		width: { size: sidebarWidthPct, type: WidthType.PERCENTAGE },
@@ -399,8 +404,9 @@ export function buildDocument(data: ResumeData, resolveTitle?: SectionTitleResol
 
 	// Template-aware layout config
 	const templateConfig = TEMPLATE_CONFIGS[data.metadata.template];
-	// Both table cells carry the gap as padding on the side facing the other column.
-	const cellPaddingTwips = templateConfig.sidebarSide === "none" ? 0 : gapXTwips;
+	// Both table cells carry the gap as padding on the same side (left when the sidebar is on the right, and
+	// vice versa). Tab stops leave room for that padding, or for Pages' own cell insets where those are wider.
+	const cellInsetTwips = Math.max(templateConfig.sidebarSide === "none" ? 0 : gapXTwips, PAGES_CELL_INSETS_TWIPS);
 
 	// Compute sidebar background shading hex
 	let sidebarShadingHex: string | undefined;
@@ -449,7 +455,7 @@ export function buildDocument(data: ResumeData, resolveTitle?: SectionTitleResol
 			}
 		} else {
 			// Render main sections with normal colors
-			setRenderConfig({ ...mainConfig, contentWidthTwips: columnWidths.main - cellPaddingTwips });
+			setRenderConfig({ ...mainConfig, contentWidthTwips: columnWidths.main - cellInsetTwips });
 
 			const mainParagraphs: Paragraph[] = [];
 			if (templateConfig.headerPosition === "main-only" && showHeader) {
@@ -464,7 +470,7 @@ export function buildDocument(data: ResumeData, resolveTitle?: SectionTitleResol
 				...mainConfig,
 				textColorHex: sidebarTextColorHex,
 				primaryColorHex: sidebarHeadingColorHex,
-				contentWidthTwips: columnWidths.sidebar - cellPaddingTwips,
+				contentWidthTwips: columnWidths.sidebar - cellInsetTwips,
 			});
 
 			const sidebarParagraphs: Paragraph[] = [];
