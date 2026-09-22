@@ -48,6 +48,21 @@ function ptToTwips(pt: number): number {
 const A4_PAGE_SIZE = { width: 210, height: 297 };
 const LETTER_PAGE_SIZE = { width: 215.9, height: 279.4 };
 
+/**
+ * Declares `Normal` as the default paragraph style. Without a default, Apple Pages gives every paragraph
+ * that has no explicit style the style of the paragraph before it, so everything after a section heading
+ * renders as a heading. The docx library's `paragraphStyles` option cannot flag a style as the default,
+ * but external styles can — and the library merges them with its built-in styles rather than replacing them.
+ */
+const DEFAULT_PARAGRAPH_STYLE_XML =
+	'<w:styles xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"' +
+	' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"' +
+	' xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' +
+	' xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"' +
+	' xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml" mc:Ignorable="w14 w15">' +
+	'<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>' +
+	"</w:styles>";
+
 // --- Invisible border preset for table cells ---
 
 const NO_BORDERS = {
@@ -447,6 +462,7 @@ export function buildDocument(data: ResumeData, resolveTitle?: SectionTitleResol
 	}
 
 	return new Document({
+		externalStyles: DEFAULT_PARAGRAPH_STYLE_XML,
 		styles: {
 			default: {
 				document: {
