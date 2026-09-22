@@ -13,9 +13,10 @@ let bodyFont: string | undefined;
 let bodySize: number | undefined;
 let textColor: string | undefined;
 let primaryColor: string | undefined;
+let contentWidth: number | undefined;
 
 /**
- * Configures the typography and colors used by all section renderers.
+ * Configures the typography, colors and available width used by all section renderers.
  * Must be called before any render functions.
  */
 export function setRenderConfig(config: {
@@ -25,6 +26,8 @@ export function setRenderConfig(config: {
 	bodySizeHalfPt: number;
 	textColorHex: string;
 	primaryColorHex: string;
+	/** Width in twips the rendered paragraphs flow in (text area or table column, minus cell padding). */
+	contentWidthTwips?: number;
 }): void {
 	headingFont = config.headingFont;
 	headingSize = config.headingSizeHalfPt;
@@ -32,6 +35,7 @@ export function setRenderConfig(config: {
 	bodySize = config.bodySizeHalfPt;
 	textColor = config.textColorHex;
 	primaryColor = config.primaryColorHex;
+	contentWidth = config.contentWidthTwips;
 }
 
 function getHtmlStyle(): HtmlStyleConfig {
@@ -99,7 +103,8 @@ function titleAndSubtitle(primary: string, secondary: string, rightText?: string
 	}
 
 	return new Paragraph({
-		tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
+		// TabStopPosition.MAX assumes A4 with 1-inch margins; anchor to the real right edge instead.
+		tabStops: [{ type: TabStopType.RIGHT, position: contentWidth ?? TabStopPosition.MAX }],
 		spacing: { before: 120 },
 		children,
 	});

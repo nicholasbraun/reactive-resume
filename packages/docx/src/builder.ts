@@ -399,6 +399,8 @@ export function buildDocument(data: ResumeData, resolveTitle?: SectionTitleResol
 
 	// Template-aware layout config
 	const templateConfig = TEMPLATE_CONFIGS[data.metadata.template];
+	// Both table cells carry the gap as padding on the side facing the other column.
+	const cellPaddingTwips = templateConfig.sidebarSide === "none" ? 0 : gapXTwips;
 
 	// Compute sidebar background shading hex
 	let sidebarShadingHex: string | undefined;
@@ -426,6 +428,7 @@ export function buildDocument(data: ResumeData, resolveTitle?: SectionTitleResol
 		bodySizeHalfPt: bodySize,
 		textColorHex,
 		primaryColorHex: colorHex,
+		contentWidthTwips: textAreaWidthTwips,
 	};
 	const showHeader = shouldShowResumeHeader(data);
 
@@ -446,7 +449,7 @@ export function buildDocument(data: ResumeData, resolveTitle?: SectionTitleResol
 			}
 		} else {
 			// Render main sections with normal colors
-			setRenderConfig(mainConfig);
+			setRenderConfig({ ...mainConfig, contentWidthTwips: columnWidths.main - cellPaddingTwips });
 
 			const mainParagraphs: Paragraph[] = [];
 			if (templateConfig.headerPosition === "main-only" && showHeader) {
@@ -457,7 +460,12 @@ export function buildDocument(data: ResumeData, resolveTitle?: SectionTitleResol
 			}
 
 			// Render sidebar sections with potentially inverted colors
-			setRenderConfig({ ...mainConfig, textColorHex: sidebarTextColorHex, primaryColorHex: sidebarHeadingColorHex });
+			setRenderConfig({
+				...mainConfig,
+				textColorHex: sidebarTextColorHex,
+				primaryColorHex: sidebarHeadingColorHex,
+				contentWidthTwips: columnWidths.sidebar - cellPaddingTwips,
+			});
 
 			const sidebarParagraphs: Paragraph[] = [];
 			if (templateConfig.headerPosition === "sidebar-only" && showHeader) {

@@ -46,6 +46,12 @@ function textAreaWidth(body: unknown): number {
 	return Number(size?.["w:w"]) - Number(margin?.["w:left"]) - Number(margin?.["w:right"]);
 }
 
+function tabStopPositions(body: unknown): number[] {
+	return attrsOf(body, "w:tab")
+		.filter((attrs) => attrs["w:pos"] !== undefined)
+		.map((attrs) => Number(attrs["w:pos"]));
+}
+
 function fullWidthSample(): ResumeData {
 	const data = structuredClone(sampleResumeData);
 	const [page] = data.metadata.layout.pages;
@@ -76,6 +82,14 @@ describe("DOCX page layout", () => {
 		expect(String(normal?.["w:default"])).toMatch(/^(1|true)$/);
 	});
 
+	it("right-aligns item dates at the edge of the text area in a full-width layout", () => {
+		const { body } = render(fullWidthSample());
+		const positions = tabStopPositions(body);
+
+		expect(positions.length).toBeGreaterThan(0);
+		for (const position of positions) expect(position).toBe(textAreaWidth(body));
+	});
+
 	it("sizes the two-column grid in twips and fixes the table layout", () => {
 		// Pages and LibreOffice lay columns out from <w:tblGrid>; the docx default is 100 twips per column.
 		const { body } = render(twoColumnSample());
@@ -86,5 +100,16 @@ describe("DOCX page layout", () => {
 		expect(Math.abs(main + sidebar - textAreaWidth(body))).toBeLessThanOrEqual(1);
 		expect(sidebar / (main + sidebar)).toBeCloseTo(0.35, 2);
 		expect(attrsOf(body, "w:tblLayout").map((attrs) => attrs["w:type"])).toEqual(["fixed"]);
+	});
+
+	it("right-aligns item dates at the inner edge of their table column", () => {
+		const data = twoColumnSample();
+		const { body } = render(data);
+		const [main = 0, sidebar = 0] = attrsOf(body, "w:gridCol").map((attrs) => Number(attrs["w:w"]));
+		const gapX = data.metadata.page.gapX * 20;
+		const positions = tabStopPositions(body);
+
+		expect(positions.length).toBeGreaterThan(0);
+		for (const position of positions) expect([main - gapX, sidebar - gapX]).toContain(position);
 	});
 });
