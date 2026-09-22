@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { describe, expect, it } from "vitest";
+import { Document } from "docx";
 import { htmlToParagraphs } from "./html-to-docx";
 
 describe("htmlToParagraphs", () => {
@@ -38,6 +39,21 @@ describe("htmlToParagraphs", () => {
 		const html = '<p><a href="https://example.com">link</a></p><ul><li>One</li><li>Two</li></ul>';
 		const result = htmlToParagraphs(html);
 		expect(result.length).toBeGreaterThanOrEqual(2);
+	});
+
+	it("bullets list items whose text is wrapped in <p>, as the rich-text editor stores them", () => {
+		const paragraphs = htmlToParagraphs("<ul><li><p>First</p></li><li><p>Second</p><p>Continued</p></li></ul>");
+		const file = new Document({ sections: [{ children: paragraphs }] });
+		const [first, second, continued] = paragraphs.map((paragraph) =>
+			JSON.stringify(paragraph.prepForXml({ file, viewWrapper: file.Document, stack: [] })),
+		);
+
+		expect(paragraphs).toHaveLength(3);
+		expect(first).toContain('"w:numPr"');
+		expect(second).toContain('"w:numPr"');
+		// A second paragraph in the same item continues under the bullet text instead of starting a new bullet.
+		expect(continued).not.toContain('"w:numPr"');
+		expect(continued).toContain('"w:start":720');
 	});
 
 	it("accepts custom font + size config without throwing", () => {

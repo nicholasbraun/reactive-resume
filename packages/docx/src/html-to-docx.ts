@@ -183,20 +183,35 @@ function processBlockElement(
 			);
 
 			if (hasNestedBlocks) {
+				// The item's first paragraph carries the bullet; later ones continue under the bullet text.
+				let bulleted = false;
+				const itemParagraph = (children: InlineChild[]) =>
+					new Paragraph({
+						children,
+						...(bulleted
+							? { indent: { start: (level + 1) * 720 + quoteIndent } }
+							: { bullet: { level }, ...(listIndent ? { indent: listIndent } : {}) }),
+					});
+
 				for (const liChild of li.childNodes) {
 					if (liChild.nodeType === Node.TEXT_NODE) {
 						const text = (liChild.textContent ?? "").trim();
 						if (text) {
-							paragraphs.push(
-								new Paragraph({
-									children: [new TextRun({ text, ...mergedStyle })],
-									bullet: { level },
-									...(listIndent ? { indent: listIndent } : {}),
-								}),
-							);
+							paragraphs.push(itemParagraph([new TextRun({ text, ...mergedStyle })]));
+							bulleted = true;
 						}
 					} else if (liChild.nodeType === Node.ELEMENT_NODE) {
-						processBlockElement(liChild as HTMLElement, mergedStyle, paragraphs, level, quoteIndent);
+						const child = liChild as HTMLElement;
+						// The rich-text editor wraps every list item's text in <p>.
+						if (child.tagName === "P") {
+							const inlineChildren = collectInlineChildren(child, mergeStyle(mergedStyle, "P", child));
+							if (inlineChildren.length > 0) {
+								paragraphs.push(itemParagraph(inlineChildren));
+								bulleted = true;
+							}
+						} else {
+							processBlockElement(child, mergedStyle, paragraphs, level, quoteIndent);
+						}
 					}
 				}
 			} else {
